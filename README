@@ -1,0 +1,32 @@
+This project is about a motion detection system.
+
+The master branch is the stable branch. All files on the master branch are intended to work properly. Development are performed on branches different from the master, and are divided by functionality (eg: If adding a capture module loading a file from disk, this development is performed on a branch called, capture_load_file). After and only when a feature is stable, it may be merge into the master branch.
+
+Name conventions are not stablish yet, however the selected name must show a explicit description of its use.
+
+To compile this project execute the make command.
+
+The basic tructure of this Project is presented next:
+
+motion_detection
+           |
+           |
+            \------Makefile
+           |
+           |
+            \------src
+           |
+           |
+            \------include
+           |
+           |
+            \------bin
+
+
+Makefile : Master makefile of the project. For more information refer to the header in this file
+
+src      : Directory for the source files. For more information refer to the README file in this directory
+
+include  : Directory for the posible include files tha may be implemented. For more information refer to the README file in this directory
+
+bin      : Directory for the bin file. For more information refer to the README file in this directory
