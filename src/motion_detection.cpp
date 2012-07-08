@@ -15,7 +15,7 @@ using namespace std;
 /********************************Defines**************************************/
 #define CAM_NUM 0 // NUmber of device used
 #define FILENAME "snapshot.jpg" // name for a saved file if wanted
-#define _THRESVAL 30
+#define _THRESVAL 10
 #define _SIGMA 2
 /*******************************Main Function*********************************/
 int main( int argc, char** argv ) {
@@ -34,9 +34,9 @@ int main( int argc, char** argv ) {
 
    Mat img_gray, img_first, img_prev, img_diff, img_bin;
 
-   namedWindow(win_cap, CV_WINDOW_AUTOSIZE ); // Create window
-   namedWindow(win_diff1, CV_WINDOW_AUTOSIZE);
-   namedWindow(win_diff2, CV_WINDOW_AUTOSIZE);
+   namedWindow(win_cap, CV_WINDOW_AUTOSIZE ); // Create window to show the capture
+   namedWindow(win_diff1, CV_WINDOW_AUTOSIZE); // Create a window to show the diff with first image
+   namedWindow(win_diff2, CV_WINDOW_AUTOSIZE); // Create a window to show diff with last frame
 
    /* Try to open the camera */
    cap.open(CAM_NUM);
@@ -58,7 +58,8 @@ int main( int argc, char** argv ) {
 
       flip(frame,frame,1);
       cvtColor(frame, img_gray, CV_BGR2GRAY);
-      GaussianBlur(img_gray, img_gray, Size(0,0), sigma, sigma);
+      //Gaussian blur can be used in order to obtain a smooth grayscale digital image of a halftone print
+      GaussianBlur(img_gray, img_gray, Size(0,0), sigma, sigma); // Reduce noise and detail by blurring the image
 
       if (first_frame) {
          img_prev = img_gray.clone();
@@ -81,7 +82,7 @@ int main( int argc, char** argv ) {
 
       img_prev=img_gray.clone();
 
-      char c = (char)waitKey(10);
+      char c = (char)waitKey(50);
       if( c == 27 ) { //Stop if Esc is pressed
          break;
       }
@@ -89,6 +90,7 @@ int main( int argc, char** argv ) {
       if (c == 'c') { // capture image and save
          cout << "Saving image\n";
          imwrite(FILENAME, image);
+         img_first = img_gray.clone();
       }
    }
 
