@@ -30,8 +30,7 @@ int main( int argc, char** argv ) {
    float sigma =  _SIGMA;
    bool first_frame = true;
    const char *win_cap  = "Capture";
-   const char *win_diff1 = "Diff from first frame";
-   const char *win_diff2 = "Diff from prev frame"; 
+   const char *win_diff1 = "Diff from prev frame";
 
    CvCapture *cap = 0;
    IplImage *image = 0; /* 2D or multi-dimensional dense array (can be used to store 
@@ -42,12 +41,12 @@ int main( int argc, char** argv ) {
 
    cvNamedWindow(win_cap, CV_WINDOW_AUTOSIZE ); // Create window to show the capture
    cvNamedWindow(win_diff1, CV_WINDOW_AUTOSIZE); // Create a window to show the diff with first image
-   cvNamedWindow(win_diff2, CV_WINDOW_AUTOSIZE); // Create a window to show diff with last frame
 
    /* Try to open the camera */
    //cap.open(CAM_NUM);
 
-   if(!(cvCaptureFromCAM(CAM_NUM))) { // camera couldn't be opened
+   cap = cvCaptureFromCAM(CAM_NUM);
+   if(!(cap)) { // camera couldn't be opened
       printf( "***Could not initialize capturing...***\n");
       return -1;
    }
@@ -59,17 +58,16 @@ int main( int argc, char** argv ) {
       //   printf("Couldn't capture frame");
       //   break;
       //}
-      frame = cvGrabFrame( cap ); // Set the capture on the matrix frame
-      if (frame) {
-      cvCopy(frame, image, 0);
-      //frame.copyTo(image);
+      frame = cvQueryFrame(cap); // Set the capture on the matrix frame
+      image = cvCloneImage(frame);
       cvShowImage(win_cap, image ); // Show image
 
+      //img_gray = cvCloneImage(frame);
       cvFlip(frame,frame,1);
+      img_gray = cvCreateImage(cvGetSize(frame), 8, 1);
       cvCvtColor(frame, img_gray, CV_BGR2GRAY);
       //Gaussian blur can be used in order to obtain a smooth grayscale digital image of a halftone print
       cvSmooth(img_gray, img_gray, CV_GAUSSIAN, 0, 0, sigma, 0);
-      //cvGaussianBlur(img_gray, img_gray,cvSize(0,0), sigma, sigma); // Reduce noise and detail by blurring the image
 
       if (first_frame) {
          img_prev = cvCloneImage(img_gray);
@@ -78,21 +76,16 @@ int main( int argc, char** argv ) {
          continue;
       }
 
+      img_diff = cvCreateImage(cvGetSize(img_gray), 8, 1);
       cvAbsDiff(img_gray, img_prev, img_diff);
+      img_bin = cvCreateImage(cvGetSize(img_diff), 8, 1);
       cvThreshold(img_diff, img_bin, thresval, 255, CV_THRESH_BINARY);
-      //cvErode(img_bin, img_bin, cvMat(), Point(-1,-1), 3);
+      cvErode(img_bin, img_bin, cvGetSize(img_bin), Point(-1,-1), 3);
       //cvDilate(img_bin, img_bin, cvMat(), Point(-1,-1), 1);
       cvShowImage(win_diff1, img_bin);
 
-      //absdiff(img_gray, img_first, img_diff);
-      //threshold(img_diff, img_bin, thresval, 255, CV_THRESH_BINARY);
-      //erode(img_bin, img_bin, Mat(), Point(-1,-1), 3);
-      //dilate(img_bin, img_bin, Mat(), Point(-1,-1), 1);
-      //imshow(win_diff2, img_bin);
-
       img_prev= cvCloneImage(img_gray);
 
-      }
       char c = (char)cvWaitKey(50);
       if( c == 27 ) { //Stop if Esc is pressed
          break;
@@ -100,8 +93,7 @@ int main( int argc, char** argv ) {
 
       if (c == 'c') { // capture image and save
          printf( "Saving image\n");
-       //  imwrite(FILENAME, image);
-         img_first = cvCloneImage(img_gray);
+         //img_first = cvCloneImage(img_gray);
       }
    }
 
@@ -109,7 +101,6 @@ int main( int argc, char** argv ) {
    printf("Closing App");
    cvDestroyWindow(win_cap);
    cvDestroyWindow(win_diff1);
-   cvDestroyWindow(win_diff2);
    cvReleaseCapture(&cap);
    return 0;
  }

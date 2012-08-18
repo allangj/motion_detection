@@ -29,7 +29,7 @@ all: build
 
 build:
 	@echo Compiling the source code
-	@g++ -ggdb `pkg-config --cflags opencv` -o $(BINDIR)/$(OBJECT) $(SRCDIR)/$(OBJECT).cpp `pkg-config --libs opencv`
+	@gcc -ggdb `pkg-config --cflags opencv` -o $(BINDIR)/$(OBJECT) $(SRCDIR)/$(OBJECT).c `pkg-config --libs opencv`
 
 install:
 
