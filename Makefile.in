@@ -1,0 +1,31 @@
+#-------------------------------Makefile Includes-----------------------------#
+# This is the include makefile. This makefile define important flags for the
+# project in the repository.
+#
+# Copyright (C) 2010 by Allan Granados Jiménez (allangj1_618@hotmail.com)
+#                       Norwin Alexander Leiva (norxander@gmail.com)
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+#
+#-----------------------------------------------------------------------------#
+
+shell = /bin/sh
+
+OBJECT		= motion_detection
+SRCDIR		= src
+BINDIR		= bin
+INCLUDEDIR	= include
+
+CC		= gcc
+
+OPCV_CFLAGS	= -ggdb `pkg-config --cflags opencv`
+OPCV_LDFLAGS	= `pkg-config --libs opencv`
+
+LXRT_CFLAGS	= $(shell rtai-config --lxrt-cflags)
+LXRT_LDFLAGS 	= $(shell rtai-config --lxrt-ldflags)
+
+RTAI_CFLAGS	= -O -g $(LXRT_CFLAGS)
+RTAI_LDFLAGS	= $(LXRT_LDFLAGS) -lrt
+

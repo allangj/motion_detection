@@ -17,19 +17,15 @@
 #
 #-----------------------------------------------------------------------------#
 
-SRCDIR		= src
-BINDIR		= bin
-INCLUDEDIR	= include
-OBJECT		= motion_detection
+include Makefile.in
 
 .PHONY: all build install clean
-
 
 all: build
 
 build:
 	@echo Compiling the source code
-	@gcc -ggdb `pkg-config --cflags opencv` -o $(BINDIR)/$(OBJECT) $(SRCDIR)/$(OBJECT).c `pkg-config --libs opencv`
+	@$(CC) $(LXRT_CFLAGS) $(OPCV_CFLAGS) -o $(BINDIR)/$(OBJECT) $(SRCDIR)/$(OBJECT).c $(OPCV_LDFLAGS) $(RTAI_LDFLAGS)
 
 install:
 

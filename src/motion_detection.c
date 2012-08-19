@@ -60,10 +60,10 @@ IplImage *img_bin=0; // Processed image to display
 /*****************************************************************************/
 
 /**************************Function definition********************************/
-void cleanup();
-void *capture_data();
-void *img_subs();
-void *display_data();
+void cleanup(void);
+void *capture_data(void);
+void *img_subs(void);
+void *display_data(void);
 /*****************************************************************************/
 
 /*******************************Main Function*********************************/
@@ -315,9 +315,6 @@ void *capture_data() {
    printf("Init TSK1TH loop\n");
    last_activation_start_time_ns = rt_get_time_ns();
    printf( "\nInit TSK1TH task %p\n", t1 );
-
-   // Try to open the camera
-   cap.open(CAM_NUM);
 
    // Review if the camera can be opened
    cap = cvCaptureFromCAM(CAM_NUM);
