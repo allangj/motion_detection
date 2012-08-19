@@ -69,6 +69,7 @@ void *display_data(void);
 /*******************************Main Function*********************************/
 int main( int argc, char** argv ) {
 
+   rt_allow_nonroot_hrt();
    // RTAI => Initialize main task : supervision
    if(!( maintask = rt_task_init_schmod(nam2num("MAINTK"), 1, 0, 0, SCHED_FIFO, 0xFF))) {
       printf("Cannot init MAINTK task\n");
@@ -320,7 +321,7 @@ void *capture_data() {
    cap = cvCaptureFromCAM(CAM_NUM);
    if(!(cap)) { // camera couldn't be opened
       printf( "***Could not initialize capturing...***\n");
-      return -1;
+      exit(1);
    }
 
    // Infinite loop
