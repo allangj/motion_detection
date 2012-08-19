@@ -33,11 +33,12 @@ int main( int argc, char** argv ) {
    const char *win_diff1 = "Diff from prev frame";
 
    CvCapture *cap = 0;
-   IplImage *image = 0; /* 2D or multi-dimensional dense array (can be used to store 
-              matrices, images, histograms, feature descriptors, voxel 
-              volumes etc.)*/
-
-   IplImage *img_gray=0, *img_first=0, *img_prev=0, *img_diff=0, *img_bin=0;
+   IplImage *frame = 0;
+   IplImage *image=0;
+   IplImage *img_prev=0;
+   IplImage *img_gray=0;
+   IplImage *img_diff=0; 
+   IplImage *img_bin=0;
 
    cvNamedWindow(win_cap, CV_WINDOW_AUTOSIZE ); // Create window to show the capture
    cvNamedWindow(win_diff1, CV_WINDOW_AUTOSIZE); // Create a window to show the diff with first image
@@ -53,12 +54,12 @@ int main( int argc, char** argv ) {
 
 
    for(;;) { /* Infinite loop */
-      IplImage *frame = 0;
       //if(!cvGrabFrame(cap)){ // If no capture terminate infinite loop
       //   printf("Couldn't capture frame");
       //   break;
       //}
       frame = cvQueryFrame(cap); // Set the capture on the matrix frame
+      cvReleaseImage(&image);
       image = cvCloneImage(frame);
       cvShowImage(win_cap, image ); // Show image
 
@@ -71,7 +72,6 @@ int main( int argc, char** argv ) {
 
       if (first_frame) {
          img_prev = cvCloneImage(img_gray);
-         img_first = cvCloneImage(img_gray);
          first_frame = false;
          continue;
       }
@@ -80,27 +80,34 @@ int main( int argc, char** argv ) {
       cvAbsDiff(img_gray, img_prev, img_diff);
       img_bin = cvCreateImage(cvGetSize(img_diff), 8, 1);
       cvThreshold(img_diff, img_bin, thresval, 255, CV_THRESH_BINARY);
-      cvErode(img_bin, img_bin, cvGetSize(img_bin), Point(-1,-1), 3);
-      //cvDilate(img_bin, img_bin, cvMat(), Point(-1,-1), 1);
+      cvErode(img_bin, img_bin, NULL, 3);
+      cvDilate(img_bin, img_bin, NULL, 1);
       cvShowImage(win_diff1, img_bin);
 
+      cvReleaseImage(&img_prev);
       img_prev= cvCloneImage(img_gray);
+
+      cvReleaseImage(&img_gray);
+      cvReleaseImage(&img_diff); 
+      cvReleaseImage(&img_bin);
 
       char c = (char)cvWaitKey(50);
       if( c == 27 ) { //Stop if Esc is pressed
          break;
       }
 
-      if (c == 'c') { // capture image and save
-         printf( "Saving image\n");
-         //img_first = cvCloneImage(img_gray);
-      }
    }
 
    // Release the capture device housekeeping
    printf("Closing App");
    cvDestroyWindow(win_cap);
    cvDestroyWindow(win_diff1);
+   cvReleaseImage(&frame);
+   cvReleaseImage(&image);
+   cvReleaseImage(&img_prev);
+   cvReleaseImage(&img_gray);
+   cvReleaseImage(&img_diff); 
+   cvReleaseImage(&img_bin);
    cvReleaseCapture(&cap);
    return 0;
  }
