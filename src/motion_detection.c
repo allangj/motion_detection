@@ -21,8 +21,10 @@
 /*****************************************************************************/
 
 /********************************Defines**************************************/
+// Debug
+#define DEBUG
 // RTAI
-#define PERIOD_NS 1000000 // Control loop period in nanoseconds -> 1.00 kHz
+#define PERIOD_NS 1000000 // Control loop period in nanoseconds -> 1.00 KHz
 #define PERIOD_S  (PERIOD_NS/1.0e9) // Control loop period in seconds        
 #define DELTA_T   100000 // Max. allowed timing error in nanoseconds -> 0.1 ms
 
@@ -86,9 +88,9 @@ int main( int argc, char** argv ) {
 
    // Start the RT timer
    rt_set_periodic_mode();               // set periodic mode to function
-   period = nano2count(PERIOD_NS);       /* PERIOD_NS is defined in 
-                                            src/include/parameters.h */
-   timeout = nano2count( 10*PERIOD_NS );
+   period = nano2count(PERIOD_NS);       /* PERIOD_NS */
+   //timeout = nano2count( 10*PERIOD_NS );
+   timeout = nano2count( 100*PERIOD_NS );
    start_rt_timer(period);               /* start the timer with period 
                                             defined, this interrup each
                                             period */
@@ -193,7 +195,7 @@ int main( int argc, char** argv ) {
          } else if( count == count_prev[2] ) {
             blocked[2] = 2;
             printf("TSK3TH is blocked\n");
-            break;
+            //break;
          } else if( count == 0xFFFFFFFF ) {
             blocked[2] = 3;
             printf("TSK3TH reported an error\n");
@@ -213,7 +215,7 @@ int main( int argc, char** argv ) {
       rt_task_wait_period();
 
       // Check for termination
-      char c = (char)cvWaitKey(10);
+      char c = (char)cvWaitKey(50);
       if( c == 27 ) { //Stop if Esc is pressed
          break;
       }
@@ -402,6 +404,7 @@ void *img_subs() {
    // First frame flag
    bool first_frame = true;   // FIXME review if may be optimize to remove this
    // Subtraction variables
+   const char *win_diff = "Diff on Thread 2"; // Result window name
    int thresval = _THRESVAL;  // Threshold value
    float sigma =  _SIGMA;     // Sigma value
    IplImage *frame = 0;       // Copy of the capture image
@@ -410,6 +413,7 @@ void *img_subs() {
    IplImage *img_diff=0;      // Matrix for the image diference
    IplImage *img_bin_local=0; // Local image bin to proces and then pass it
 
+   cvNamedWindow(win_diff, CV_WINDOW_AUTOSIZE); // Create a window to show the diff with first image
    // Task initialization
    if(!(t2 = rt_task_init_schmod( nam2num("TSK2TH"), 1, 0, 0, SCHED_FIFO, 0xFF))){
       printf( "Cannot init TSK2TH task" );
@@ -433,9 +437,12 @@ void *img_subs() {
       // Share resource image. Read value
       cvReleaseImage(&frame);
       rt_sem_wait_barrier(cap_sem); // Wait for the semaphore
-      frame = cvCloneImage(image);
+      if (image != 0) {
+         frame = cvCloneImage(image);
+      }
       rt_sem_signal(cap_sem);       // give up semaphore
 
+      if (frame != 0) {
       // Flip frame
       cvFlip(frame,frame,1);
       // Set in gray scale
@@ -443,7 +450,7 @@ void *img_subs() {
       img_gray = cvCreateImage(cvGetSize(frame), 8, 1);
       cvCvtColor(frame, img_gray, CV_BGR2GRAY);
       // Reduce noise and detail by blurring the image
-      cvSmooth(img_gray, img_gray, CV_GAUSSIAN, 0, 0, sigma, 0);
+//      cvSmooth(img_gray, img_gray, CV_GAUSSIAN, 0, 0, sigma, 0);
 
       if (first_frame) { // FIXME review if may be optimize to remove this
          cvReleaseImage(&img_prev);
@@ -468,9 +475,11 @@ void *img_subs() {
       img_bin = cvCloneImage(img_bin_local);
       rt_sem_signal(sub_sem);       // give up semaphore
 
+      cvShowImage(win_diff, img_bin_local ); // Show image
       // Store image in previous matrix
       cvReleaseImage(&img_prev);
       img_prev= cvCloneImage(img_gray);
+      }
 
       // RT loop stats
       activation_start_time_ns = rt_get_time_ns();
@@ -486,15 +495,15 @@ void *img_subs() {
       if ((task_h = rt_receive_if( 0, &count ))) {
          if( count == count_prev ) {
             rt_return( task_h, 0xFFFFFFFF );
-            printf("TSK1TH Supervision task blocked\n");
+            printf("TSK2TH Supervision task blocked\n");
             break;
          } else if ( count == 0xFFFFFFFF ) {
             rt_return( task_h, internal_count );
-            printf( "TSK1TH received termination message\n" );
+            printf( "TSK2TH received termination message\n" );
             break;
          } else if( error ) {
             rt_return( task_h, 0xFFFFFFFF );
-            printf("TSK1TH error detected: %d\n", error);
+            printf("TSK2TH error detected: %d\n", error);
             break;
          } else {
             rt_return( task_h, internal_count );
@@ -546,7 +555,6 @@ void *display_data() {
    // Create the container windows
    cvNamedWindow(win_cap, CV_WINDOW_AUTOSIZE ); // Create window to show the capture
    cvNamedWindow(win_diff1, CV_WINDOW_AUTOSIZE); // Create a window to show the diff with first image
-
    // Task initialization
    if(!(t3 = rt_task_init_schmod( nam2num("TSK3TH"), 1, 0, 0, SCHED_FIFO, 0xFF))){
       printf( "Cannot init TSK3TH task" );
@@ -573,16 +581,22 @@ void *display_data() {
       cvReleaseImage(&local_image);
       // Copy image
       rt_sem_wait_barrier(cap_sem); // Wait for the semaphore
-      local_image = cvCloneImage(image);
+      if (image != 0) {
+         local_image = cvCloneImage(image);
+      }
       rt_sem_signal(cap_sem);       // give up semaphore
       // Copy processed
       rt_sem_wait_barrier(sub_sem); // Wait for the semaphore
-      local_img_bin = cvCloneImage(img_bin);
+      if (img_bin != 0) {
+         local_img_bin = cvCloneImage(img_bin);
+      }
       rt_sem_signal(sub_sem);       // give up semaphore
 
       // Display images
+      if ((local_image != 0) && (local_img_bin != 0)) {
       cvShowImage(win_cap, local_image ); // Show image
       cvShowImage(win_diff1, local_img_bin);
+      }
 
       // RT loop stats
       activation_start_time_ns = rt_get_time_ns();
@@ -598,15 +612,15 @@ void *display_data() {
       if ((task_h = rt_receive_if( 0, &count ))) {
          if( count == count_prev ) {
             rt_return( task_h, 0xFFFFFFFF );
-            printf("TSK1TH Supervision task blocked\n");
+            printf("TSK3TH Supervision task blocked\n");
             break;
          } else if ( count == 0xFFFFFFFF ) {
             rt_return( task_h, internal_count );
-            printf( "TSK1TH received termination message\n" );
+            printf( "TSK3TH received termination message\n" );
             break;
          } else if( error ) {
             rt_return( task_h, 0xFFFFFFFF );
-            printf("TSK1TH error detected: %d\n", error);
+            printf("TSK3TH error detected: %d\n", error);
             break;
          } else {
             rt_return( task_h, internal_count );
