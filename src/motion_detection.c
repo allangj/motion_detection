@@ -1,3 +1,17 @@
+//--------------------------------Main file------------------------------------
+// This is the master makefile. This makefile must be able to compile the
+// project in the master branch of the repository.
+//
+// Copyright (C) 2012 by Allan Granados Jiménez (allangj1_618@hotmail.com)
+//                       ALexander Leiva Delgado (norxander@gmail.com)
+//
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+//
+//-----------------------------------------------------------------------------
+
 /***************************Include Files*************************************/
 //OpenCV dependencies
 #include "cv.h"
@@ -405,6 +419,7 @@ void *img_subs() {
    bool first_frame = true;   // FIXME review if may be optimize to remove this
    // Subtraction variables
    const char *win_diff = "Diff on Thread 2"; // Result window name
+
    int thresval = _THRESVAL;  // Threshold value
    float sigma =  _SIGMA;     // Sigma value
    IplImage *frame = 0;       // Copy of the capture image
