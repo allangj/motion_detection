@@ -1,6 +1,4 @@
 //--------------------------------Main file------------------------------------
-// This is the master makefile. This makefile must be able to compile the
-// project in the master branch of the repository.
 //
 // Copyright (C) 2012 by Allan Granados Jiménez (allangj1_618@hotmail.com)
 //                       ALexander Leiva Delgado (norxander@gmail.com)
@@ -160,7 +158,7 @@ int main( int argc, char** argv ) {
          if( task == 0 ) {
             blocked[0] = 1;
             printf("TSK1TH message timeout\n");
-             break;
+            break;
          } else if( count == count_prev[0]) {
             blocked[0] = 2;
             printf("TSK1TH is blocked\n");
@@ -251,7 +249,6 @@ void cleanup() {
 
    // Finish TSK1TH thread
    if((task_h = rt_get_adr(nam2num("TSK1TH"))) && !blocked[0]) {
-      // This code send a msg to the thread to terminate, do it diff
       msg = 0xFFFFFFFF; // Message indicating the thread to terminate
       rt_rpc_timed( task_h, msg, &msg, timeout );
       printf("\nWaiting TSK1TH to finish...\n");
@@ -397,6 +394,7 @@ void *capture_data() {
    // Finish task
    rt_make_soft_real_time();
    rt_task_delete(t1);
+   rt_task_delete(task_h);
    printf("\nEnd TSK1TH task %p\n", t1);
    printf("Overruns TSK1TH = %llu\n", overruns );
    printf("Worst case in ns TSK1TH: %llu\n", measured_period_ns_max );
@@ -542,6 +540,7 @@ void *img_subs() {
    // Free RTAI
    rt_make_soft_real_time();
    rt_task_delete(t2);
+   rt_task_delete(task_h);
    printf("\nEnd TSK2TH task %p\n", t2);
    printf("Overruns TSK2TH = %llu\n", overruns );
    printf("Worst case in ns TSK2TH: %llu\n", measured_period_ns_max );
@@ -657,6 +656,7 @@ void *display_data() {
    // Finish task
    rt_make_soft_real_time();
    rt_task_delete(t3);
+   rt_task_delete(task_h);
    printf("\nEnd TSK3TH task %p\n", t3);
    printf("Overruns TSK3TH = %llu\n", overruns );
    printf("Worst case in ns TSK3TH: %llu\n", measured_period_ns_max );
