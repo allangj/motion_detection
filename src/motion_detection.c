@@ -52,44 +52,39 @@ int main( int argc, char** argv ) {
       return -1;
    }
 
+   // Probe moving mallocs out
+   frame = cvQueryFrame(cap); // Set the capture on the matrix frame
+   image = cvCreateImage(cvGetSize(frame), 8, 3);
+   img_gray = cvCreateImage(cvGetSize(frame), 8, 1);
+   img_prev = cvCreateImage(cvGetSize(frame), 8, 1);
+   img_diff = cvCreateImage(cvGetSize(frame), 8, 1);
+   img_bin = cvCreateImage(cvGetSize(frame), 8, 1);
 
    for(;;) { /* Infinite loop */
-      //if(!cvGrabFrame(cap)){ // If no capture terminate infinite loop
-      //   printf("Couldn't capture frame");
-      //   break;
-      //}
       frame = cvQueryFrame(cap); // Set the capture on the matrix frame
-      cvReleaseImage(&image);
-      image = cvCloneImage(frame);
+      //cvReleaseImage(&image);
+      cvCopy(frame, image, NULL);
       cvShowImage(win_cap, image ); // Show image
 
       //img_gray = cvCloneImage(frame);
       cvFlip(frame,frame,1);
-      img_gray = cvCreateImage(cvGetSize(frame), 8, 1);
       cvCvtColor(frame, img_gray, CV_BGR2GRAY);
       //Gaussian blur can be used in order to obtain a smooth grayscale digital image of a halftone print
       cvSmooth(img_gray, img_gray, CV_GAUSSIAN, 0, 0, sigma, 0);
 
       if (first_frame) {
-         img_prev = cvCloneImage(img_gray);
+         cvCopy(img_gray, img_prev, NULL);
          first_frame = false;
          continue;
       }
 
-      img_diff = cvCreateImage(cvGetSize(img_gray), 8, 1);
       cvAbsDiff(img_gray, img_prev, img_diff);
-      img_bin = cvCreateImage(cvGetSize(img_diff), 8, 1);
       cvThreshold(img_diff, img_bin, thresval, 255, CV_THRESH_BINARY);
       cvErode(img_bin, img_bin, NULL, 3);
       cvDilate(img_bin, img_bin, NULL, 1);
       cvShowImage(win_diff1, img_bin);
 
-      cvReleaseImage(&img_prev);
-      img_prev= cvCloneImage(img_gray);
-
-      cvReleaseImage(&img_gray);
-      cvReleaseImage(&img_diff); 
-      cvReleaseImage(&img_bin);
+      cvCopy(img_gray, img_prev, NULL);
 
       char c = (char)cvWaitKey(50);
       if( c == 27 ) { //Stop if Esc is pressed
