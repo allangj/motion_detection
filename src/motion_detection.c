@@ -42,6 +42,8 @@
 
 // OpenCV
 #define CAM_NUM 0         // Number of device used
+#define WIDTH 320
+#define HEIGHT 240
 #define _THRESVAL 10      // Threshold value
 #define _SIGMA 2          // Sigma value
 /*****************************************************************************/
@@ -67,9 +69,10 @@ unsigned char blocked[3] = {0};
 SEM *cap_sem, // Capture data semaphore
     *sub_sem; // Processed data semaphore
 
+CvSize img_size;
 // Shared matrix for images
-IplImage *image=0;   // Capture image matrix
-IplImage *img_bin=0; // Processed image to display
+IplImage *image = 0;   // Capture image matrix
+IplImage *img_bin = 0; // Processed image to display
 
 /*****************************************************************************/
 
@@ -84,6 +87,13 @@ void *display_data(void);
 int main( int argc, char** argv ) {
 
    rt_allow_nonroot_hrt();
+
+   // Allocate shared structures
+   img_size.width  = WIDTH;
+   img_size.height = HEIGHT;
+   image = cvCreateImage(img_size, 8, 3);
+   img_bin = cvCreateImage(img_size, 8, 1);
+
    // RTAI => Initialize main task : supervision
    if(!( maintask = rt_task_init_schmod(nam2num("MAINTK"), 1, 0, 0, SCHED_FIFO, 0xFF))) {
       printf("Cannot init MAINTK task\n");
@@ -312,6 +322,8 @@ void *capture_data() {
    // Frame to store the capture data
    IplImage *frame = 0;
 
+   // Allocate image memory
+
    // Task initialization
    if(!(t1 = rt_task_init_schmod( nam2num("TSK1TH"), 1, 0, 0, SCHED_FIFO, 0xFF))){
       printf( "Cannot init TSK1TH task" );
@@ -348,8 +360,7 @@ void *capture_data() {
 
       // Share resource image
       rt_sem_wait_barrier(cap_sem); // Wait for the semaphore
-      cvReleaseImage(&image);
-      image = cvCloneImage(frame);
+      cvCopy(frame, image, NULL);
       rt_sem_signal(cap_sem);       // give up semaphore
 
       // RT loop stats
@@ -419,12 +430,12 @@ void *img_subs() {
    const char *win_diff = "Diff on Thread 2"; // Result window name
 
    int thresval = _THRESVAL;  // Threshold value
-   float sigma =  _SIGMA;     // Sigma value
-   IplImage *frame = 0;       // Copy of the capture image
-   IplImage *img_prev=0;      // Matrix for previous image
-   IplImage *img_gray=0;      // Matrix for image in gray scale
-   IplImage *img_diff=0;      // Matrix for the image diference
-   IplImage *img_bin_local=0; // Local image bin to proces and then pass it
+   //float sigma =  _SIGMA;     // Sigma value
+   IplImage *frame = cvCreateImage(img_size, 8, 3);         // Copy of the capture image
+   IplImage *img_prev = cvCreateImage(img_size, 8, 1);      // Matrix for previous image
+   IplImage *img_gray = cvCreateImage(img_size, 8, 1);      // Matrix for image in gray scale
+   IplImage *img_diff = cvCreateImage(img_size, 8, 1);      // Matrix for the image diference
+   IplImage *img_bin_local = cvCreateImage(img_size, 8, 1); // Local image bin to proces and then pass it
 
    cvNamedWindow(win_diff, CV_WINDOW_AUTOSIZE); // Create a window to show the diff with first image
    // Task initialization
@@ -448,10 +459,9 @@ void *img_subs() {
    // Infinite loop
    for(;;) {
       // Share resource image. Read value
-      cvReleaseImage(&frame);
       rt_sem_wait_barrier(cap_sem); // Wait for the semaphore
       if (image != 0) {
-         frame = cvCloneImage(image);
+         cvCopy(image, frame, NULL);
       }
       rt_sem_signal(cap_sem);       // give up semaphore
 
@@ -459,39 +469,30 @@ void *img_subs() {
       // Flip frame
       cvFlip(frame,frame,1);
       // Set in gray scale
-      cvReleaseImage(&img_gray);
-      img_gray = cvCreateImage(cvGetSize(frame), 8, 1);
       cvCvtColor(frame, img_gray, CV_BGR2GRAY);
       // Reduce noise and detail by blurring the image
 //      cvSmooth(img_gray, img_gray, CV_GAUSSIAN, 0, 0, sigma, 0);
 
       if (first_frame) { // FIXME review if may be optimize to remove this
-         cvReleaseImage(&img_prev);
-         img_prev = cvCloneImage(img_gray);
+         cvCopy(img_gray, img_prev, NULL);
          first_frame = false;
          continue;
       }
 
       // Substraction and filter process
-      cvReleaseImage(&img_diff); 
-      img_diff = cvCreateImage(cvGetSize(img_gray), 8, 1);
       cvAbsDiff(img_gray, img_prev, img_diff);
-      cvReleaseImage(&img_bin_local);
-      img_bin_local = cvCreateImage(cvGetSize(img_diff), 8, 1);
       cvThreshold(img_diff, img_bin_local, thresval, 255, CV_THRESH_BINARY);
       cvErode(img_bin_local, img_bin_local, NULL, 3);
       cvDilate(img_bin_local, img_bin_local, NULL, 1);
 
       // Copy image to global resource to pass it to display
       rt_sem_wait_barrier(sub_sem); // Wait for the semaphore
-      cvReleaseImage(&img_bin);
-      img_bin = cvCloneImage(img_bin_local);
+      cvCopy(img_bin_local, img_bin, NULL);
       rt_sem_signal(sub_sem);       // give up semaphore
 
-      cvShowImage(win_diff, img_bin_local ); // Show image
+      cvShowImage(win_diff, img_bin_local ); // Show image FIXME not here
       // Store image in previous matrix
-      cvReleaseImage(&img_prev);
-      img_prev= cvCloneImage(img_gray);
+      cvCopy(img_gray, img_prev, NULL);
       }
 
       // RT loop stats
@@ -560,8 +561,8 @@ void *display_data() {
    // Task handler
    RT_TASK *task_h;
    // Local variables to store data
-   IplImage *local_image=0;
-   IplImage *local_img_bin=0;
+   IplImage *local_image = cvCreateImage(img_size, 8, 3);
+   IplImage *local_img_bin = cvCreateImage(img_size, 8, 1);
    // Name for the windows
    const char *win_cap  = "Capture";               // Capture window name
    const char *win_diff1 = "Diff from prev frame"; // Result window name
@@ -590,26 +591,23 @@ void *display_data() {
    // Infinite loop
    for(;;) {
       // Copy images form global resources
-      // Release previous local allocated mem
-      cvReleaseImage(&local_img_bin);
-      cvReleaseImage(&local_image);
       // Copy image
       rt_sem_wait_barrier(cap_sem); // Wait for the semaphore
       if (image != 0) {
-         local_image = cvCloneImage(image);
+         cvCopy(image, local_image, NULL);
       }
       rt_sem_signal(cap_sem);       // give up semaphore
       // Copy processed
       rt_sem_wait_barrier(sub_sem); // Wait for the semaphore
       if (img_bin != 0) {
-         local_img_bin = cvCloneImage(img_bin);
+         cvCopy(img_bin, local_img_bin, NULL);
       }
       rt_sem_signal(sub_sem);       // give up semaphore
 
       // Display images
       if ((local_image != 0) && (local_img_bin != 0)) {
-      cvShowImage(win_cap, local_image ); // Show image
-      cvShowImage(win_diff1, local_img_bin);
+         cvShowImage(win_cap, local_image ); // Show image
+         cvShowImage(win_diff1, local_img_bin);
       }
 
       // RT loop stats
