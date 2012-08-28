@@ -139,7 +139,7 @@ int main( int argc, char** argv ) {
       exit(1);
    }
    // Wait until task is created
-   while( !rt_get_adr(nam2num("TSK2TH"))) { rt_sleep(nano2count(10e+6)); }
+   while( !rt_get_adr(nam2num("TSK2TH"))) { rt_sleep(nano2count(10e+8)); }
 
    // Create thread for task3
    printf("\nInit TSK3TH thread: Display\n");
@@ -149,7 +149,7 @@ int main( int argc, char** argv ) {
       exit(1);
    }
    // Wait until task is created
-   while( !rt_get_adr(nam2num("TSK3TH"))) { rt_sleep(nano2count(10e+6)); }
+   while( !rt_get_adr(nam2num("TSK3TH"))) { rt_sleep(nano2count(5*10e+8)); }
 
    // Supervision task initialization
    rt_task_make_periodic(maintask, rt_get_time(), period);
@@ -263,8 +263,8 @@ void cleanup() {
       rt_rpc_timed( task_h, msg, &msg, timeout );
       printf("\nWaiting TSK1TH to finish...\n");
       // Wait for RT task to finish
-      while(rt_get_adr(nam2num("TSK1TH"))) { rt_sleep(nano2count(10e+6)); }
-      rt_thread_join( (int) task1 );
+      while(rt_get_adr(nam2num("TSK1TH"))) { rt_sleep(nano2count(10e+8)); }
+      rt_thread_join( (long int)task1 );
       printf("TSK1TH terminated\n");
    }
 
@@ -275,7 +275,7 @@ void cleanup() {
       printf("\nWaiting TSK2TH to finish...\n");
       // Wait for RT task to finish
       while(rt_get_adr(nam2num("TSK2TH"))) { rt_sleep(nano2count(10e+6)); }
-         rt_thread_join( (int) task2 );
+         rt_thread_join( (long int) task2 );
          printf("TSK2TH terminated\n");
    }
 
@@ -286,7 +286,7 @@ void cleanup() {
       printf("\nWaiting TSK3TH to finish...\n");
       // Wait for RT task to finish
       while(rt_get_adr(nam2num("TSK3TH"))) { rt_sleep(nano2count(10e+6)); }
-      rt_thread_join( (int) task3 );
+      rt_thread_join( (long int) task3 );
       printf("TSK3TH terminated\n");
    }
 
