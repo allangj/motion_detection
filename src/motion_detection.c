@@ -37,7 +37,7 @@
 #define DEBUG
 // RTAI
 #define PERIOD_NS 1000000 // Control loop period in nanoseconds -> 1.00 KHz
-#define PERIOD_S  (PERIOD_NS/1.0e9) // Control loop period in seconds        
+#define MAX_PERIOD  (50*PERIOD_NS) // max period allowed -> 50ms 
 #define DELTA_T   100000 // Max. allowed timing error in nanoseconds -> 0.1 ms
 
 // OpenCV
@@ -368,7 +368,7 @@ void *capture_data() {
       measured_period_ns = activation_start_time_ns - last_activation_start_time_ns;
       last_activation_start_time_ns = activation_start_time_ns;
 
-      if (measured_period_ns > (PERIOD_NS + DELTA_T)) {
+      if (measured_period_ns > (MAX_PERIOD + DELTA_T)) {
          overruns++;
          if(measured_period_ns > measured_period_ns_max) measured_period_ns_max = measured_period_ns;
       } // Debug variable to count number of loops for which the time constraint is not met
@@ -500,7 +500,7 @@ void *img_subs() {
       measured_period_ns = activation_start_time_ns - last_activation_start_time_ns;
       last_activation_start_time_ns = activation_start_time_ns;
 
-      if (measured_period_ns > (PERIOD_NS + DELTA_T)) {
+      if (measured_period_ns > (MAX_PERIOD + DELTA_T)) {
          overruns++;
          if(measured_period_ns > measured_period_ns_max) measured_period_ns_max = measured_period_ns;
       } // Debug variable to count number of loops for which the time constraint is not met
@@ -615,7 +615,7 @@ void *display_data() {
       measured_period_ns = activation_start_time_ns - last_activation_start_time_ns;
       last_activation_start_time_ns = activation_start_time_ns;
 
-      if (measured_period_ns > (PERIOD_NS + DELTA_T)) {
+      if (measured_period_ns > (MAX_PERIOD + DELTA_T)) {
          overruns++;
          if(measured_period_ns > measured_period_ns_max) measured_period_ns_max = measured_period_ns;
       } // Debug variable to count number of loops for which the time constraint is not met
