@@ -153,8 +153,6 @@ int main( int argc, char** argv ) {
 
    // Supervision task initialization
    rt_task_make_periodic(maintask, rt_get_time(), period);
-   //FIXME// Wait for barrier until the other tasks finish initializing
-   //rt_sem_wait_barrier(barrier);
 
    // Counters for software watchdog
    unsigned long internal_count = 0, count, count_prev[3] = {0xFFFFFFFE};
@@ -430,7 +428,6 @@ void *img_subs() {
    const char *win_diff = "Diff on Thread 2"; // Result window name
 
    int thresval = _THRESVAL;  // Threshold value
-   //float sigma =  _SIGMA;     // Sigma value
    IplImage *frame = cvCreateImage(img_size, 8, 3);         // Copy of the capture image
    IplImage *img_prev = cvCreateImage(img_size, 8, 1);      // Matrix for previous image
    IplImage *img_gray = cvCreateImage(img_size, 8, 1);      // Matrix for image in gray scale
@@ -470,8 +467,6 @@ void *img_subs() {
       cvFlip(frame,frame,1);
       // Set in gray scale
       cvCvtColor(frame, img_gray, CV_BGR2GRAY);
-      // Reduce noise and detail by blurring the image
-//      cvSmooth(img_gray, img_gray, CV_GAUSSIAN, 0, 0, sigma, 0);
 
       if (first_frame) { // FIXME review if may be optimize to remove this
          cvCopy(img_gray, img_prev, NULL);
