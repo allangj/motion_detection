@@ -14,6 +14,8 @@
 //OpenCV dependencies
 #include "cv.h"
 #include "highgui.h"
+// Time
+#include <time.h>
 //Standart dependencies // review ones necessary
 #include <stdbool.h>
 #include <stdio.h>
@@ -74,6 +76,15 @@ CvSize img_size;
 IplImage *image = 0;   // Capture image matrix
 IplImage *img_bin = 0; // Processed image to display
 
+// various tracking parameters (in seconds)
+const double MHI_DURATION = 1;
+const double MAX_TIME_DELTA = 0.5;
+const double MIN_TIME_DELTA = 0.05;
+// number of cyclic frame buffer used for motion detection
+// (should, probably, depend on FPS)
+const int N = 4;
+
+
 /*****************************************************************************/
 
 /**************************Function definition********************************/
@@ -92,7 +103,7 @@ int main( int argc, char** argv ) {
    img_size.width  = WIDTH;
    img_size.height = HEIGHT;
    image = cvCreateImage(img_size, 8, 3);
-   img_bin = cvCreateImage(img_size, 8, 1);
+   img_bin = cvCreateImage(img_size, 8, 3);
 
    // RTAI => Initialize main task : supervision
    if(!( maintask = rt_task_init_schmod(nam2num("MAINTK"), 1, 0, 0, SCHED_FIFO, 0xFF))) {
@@ -422,19 +433,51 @@ void *img_subs() {
    unsigned char error = 0;
    // Task handler
    RT_TASK *task_h;
-   // First frame flag
-   bool first_frame = true;   // FIXME review if may be optimize to remove this
    // Subtraction variables
    const char *win_diff = "Diff on Thread 2"; // Result window name
+   cvNamedWindow(win_diff, CV_WINDOW_AUTOSIZE); // Create a window to show the diff with first image
 
    int thresval = _THRESVAL;  // Threshold value
-   IplImage *frame = cvCreateImage(img_size, 8, 3);         // Copy of the capture image
-   IplImage *img_prev = cvCreateImage(img_size, 8, 1);      // Matrix for previous image
-   IplImage *img_gray = cvCreateImage(img_size, 8, 1);      // Matrix for image in gray scale
-   IplImage *img_diff = cvCreateImage(img_size, 8, 1);      // Matrix for the image diference
-   IplImage *img_bin_local = cvCreateImage(img_size, 8, 1); // Local image bin to proces and then pass it
 
-   cvNamedWindow(win_diff, CV_WINDOW_AUTOSIZE); // Create a window to show the diff with first image
+   int last = 0;
+   double timestamp;
+   int i, idx1, idx2;
+   CvSeq *seq;
+   CvRect comp_rect;
+   double count_cv;
+   double angle;
+   CvPoint center;
+   double magnitude;
+   CvScalar color;
+
+   // ring image buffer
+   IplImage **buf = (IplImage**)malloc(N*sizeof(buf[0]));
+   memset( buf, 0, N*sizeof(buf[0]));
+   for( i = 0; i < N; i++ ) {
+      cvReleaseImage( &buf[i] );
+      buf[i] = cvCreateImage(img_size, IPL_DEPTH_8U, 1 );
+      cvZero( buf[i] );
+   }
+   // temporary images
+   // Captured frame
+   IplImage *frame = cvCreateImage(img_size, 8, 3);
+   // Destination Image
+   IplImage *dst = cvCreateImage(img_size, 8, 3);
+   // MHI
+   IplImage *mhi = cvCreateImage(img_size, IPL_DEPTH_32F, 1 );
+   cvZero( mhi ); // clear MHI at the beginning
+   // orientation
+   IplImage *orient = cvCreateImage(img_size, IPL_DEPTH_32F, 1 );
+   // valid orientation mask
+   IplImage *mask = cvCreateImage(img_size, IPL_DEPTH_8U, 1 );
+   // motion segmentation map
+   IplImage *segmask = cvCreateImage(img_size, IPL_DEPTH_32F, 1 );
+   // Pointer silh
+   IplImage *silh;
+   // temporary storage
+   CvMemStorage *storage = 0;
+   storage = cvCreateMemStorage(0);
+
    // Task initialization
    if(!(t2 = rt_task_init_schmod( nam2num("TSK2TH"), 1, 0, 0, SCHED_FIFO, 0xFF))){
       printf( "Cannot init TSK2TH task" );
@@ -463,31 +506,88 @@ void *img_subs() {
       rt_sem_signal(cap_sem);       // give up semaphore
 
       if (frame != 0) {
-      // Flip frame
-      cvFlip(frame,frame,1);
-      // Set in gray scale
-      cvCvtColor(frame, img_gray, CV_BGR2GRAY);
+         timestamp = (double)clock()/CLOCKS_PER_SEC;
+         idx1 = last;
 
-      if (first_frame) { // FIXME review if may be optimize to remove this
-         cvCopy(img_gray, img_prev, NULL);
-         first_frame = false;
-         continue;
-      }
 
-      // Substraction and filter process
-      cvAbsDiff(img_gray, img_prev, img_diff);
-      cvThreshold(img_diff, img_bin_local, thresval, 255, CV_THRESH_BINARY);
-      cvErode(img_bin_local, img_bin_local, NULL, 3);
-      cvDilate(img_bin_local, img_bin_local, NULL, 1);
+         // convert frame to grayscale
+         cvCvtColor( frame, buf[last], CV_BGR2GRAY );
+         // index of (last - (N-1))th frame
+         idx2 = (last + 1) % N;
+         last = idx2;
+         
+         silh = buf[idx2];
+         // get difference between frames
+         cvAbsDiff( buf[idx1], buf[idx2], silh );
+         // Threshold to image
+         cvThreshold( silh, silh, thresval, 1, CV_THRESH_BINARY );
+         // update MHI
+         cvUpdateMotionHistory( silh, mhi, timestamp, MHI_DURATION );
+         // convert MHI to blue 8u image
+         cvCvtScale( mhi, mask, 255./MHI_DURATION,(MHI_DURATION - timestamp)*255./MHI_DURATION );
+         cvZero( dst );
+         cvMerge( mask, 0, 0, 0, dst );
+         // calculate motion gradient orientation and valid orientation mask
+         cvCalcMotionGradient( mhi, mask, orient, MAX_TIME_DELTA, MIN_TIME_DELTA, 3 );
+         if( !storage ) {
+            storage = cvCreateMemStorage(0); // Its already  done but just in case
+         } else {
+            cvClearMemStorage(storage);
+         }
 
-      // Copy image to global resource to pass it to display
-      rt_sem_wait_barrier(sub_sem); // Wait for the semaphore
-      cvCopy(img_bin_local, img_bin, NULL);
-      rt_sem_signal(sub_sem);       // give up semaphore
+         // segment motion: get sequence of motion components
+         // segmask is marked motion components map. It is not used further
+         seq = cvSegmentMotion( mhi, segmask, storage, timestamp, MAX_TIME_DELTA );
 
-      cvShowImage(win_diff, img_bin_local ); // Show image FIXME not here
-      // Store image in previous matrix
-      cvCopy(img_gray, img_prev, NULL);
+         // iterate through the motion components,
+         // One more iteration (i == -1) corresponds to the whole image (global motion)
+         for( i = -1; i < seq->total; i++ ) {
+            if( i < 0 ) { // case of the whole image
+               comp_rect = cvRect( 0, 0,img_size.width, img_size.height );
+               color = CV_RGB(255,255,255);
+               magnitude = 100;
+            }
+            else { // i-th motion component
+               comp_rect = ((CvConnectedComp*)cvGetSeqElem( seq, i ))->rect;
+               // reject very small components
+               if( comp_rect.width + comp_rect.height < 100 ) {
+                  continue;
+               }
+               color = CV_RGB(255,0,0);
+               magnitude = 30;
+            }
+            // select component ROI
+            cvSetImageROI( silh, comp_rect );
+            cvSetImageROI( mhi, comp_rect );
+            cvSetImageROI( orient, comp_rect );
+            cvSetImageROI( mask, comp_rect );
+            // calculate orientation
+            angle = cvCalcGlobalOrientation( orient, mask, mhi, timestamp, MHI_DURATION);
+            angle = 360.0 - angle;  // adjust for images with top-left origin
+            // calculate number of points within silhouette ROI
+            count_cv = cvNorm( silh, 0, CV_L1, 0 );
+
+            cvResetImageROI( mhi );
+            cvResetImageROI( orient );
+            cvResetImageROI( mask );
+            cvResetImageROI( silh );
+
+            // check for the case of little motion
+            if( count_cv < comp_rect.width*comp_rect.height * 0.05 ) {
+               continue;
+            }
+
+            // draw a clock with arrow indicating the direction
+            center = cvPoint((comp_rect.x + comp_rect.width/2),(comp_rect.y + comp_rect.height/2));
+
+            cvCircle( dst, center, cvRound(magnitude*1.2), color, 3, CV_AA, 0 );
+            cvLine(dst, center, cvPoint( cvRound( center.x + magnitude*cos(angle*CV_PI/180)),
+                   cvRound( center.y - magnitude*sin(angle*CV_PI/180))), color, 3, CV_AA, 0 );
+         }
+
+         rt_sem_wait_barrier(cap_sem); // Wait for the semaphore
+         cvCopy(dst, img_bin,NULL);
+         rt_sem_signal(cap_sem);       // give up semaphore
       }
 
       // RT loop stats
@@ -529,10 +629,15 @@ void *img_subs() {
    // Finish task
    // Free mem
    cvReleaseImage(&frame);
-   cvReleaseImage(&img_prev);
-   cvReleaseImage(&img_gray);
-   cvReleaseImage(&img_diff); 
-   cvReleaseImage(&img_bin_local);
+   cvReleaseImage(&dst);
+   cvReleaseImage(&mhi);
+   cvReleaseImage(&orient);
+   cvReleaseImage(&mask);
+   cvReleaseImage(&segmask);
+   cvReleaseImage(&silh);
+   for( i = 0; i < N; i++ ) {
+      cvReleaseImage( &buf[i] );
+   }
    // Free RTAI
    rt_make_soft_real_time();
    rt_task_delete(t2);
@@ -557,7 +662,7 @@ void *display_data() {
    RT_TASK *task_h;
    // Local variables to store data
    IplImage *local_image = cvCreateImage(img_size, 8, 3);
-   IplImage *local_img_bin = cvCreateImage(img_size, 8, 1);
+   IplImage *local_img_bin = cvCreateImage(img_size, 8, 3);
    // Name for the windows
    const char *win_cap  = "Capture";               // Capture window name
    const char *win_diff1 = "Diff from prev frame"; // Result window name
